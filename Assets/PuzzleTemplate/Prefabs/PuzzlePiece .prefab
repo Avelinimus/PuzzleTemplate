@@ -46,6 +46,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _spriteRenderer: {fileID: 2212831350451135243}
+  _defaultMaterial: {fileID: 2100000, guid: fc46121e6db921d499868fbfa966b8b9, type: 2}
+  _selectedMaterial: {fileID: 2100000, guid: 4d287cf81b584a644bc4277959d728c7, type: 2}
+  IsBackground: 0
 --- !u!212 &2212831350451135243
 SpriteRenderer:
   m_ObjectHideFlags: 0

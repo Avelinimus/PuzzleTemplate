@@ -167,12 +167,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9f2214887fcab3e4e9bb3928f7609a02, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _originalImage: {fileID: 2800000, guid: 7b549c5133e552140bf8314ed825a555, type: 3}
+  OriginalImage: {fileID: 2800000, guid: 7b549c5133e552140bf8314ed825a555, type: 3}
+  Rows: 3
+  Columns: 3
+  BackgroundDarkenAmount: 0.5
+  SizeJoint: 50
+  Joint: 1
+  Seed: 0
+  ColorToRemove: {r: 1, g: 1, b: 1, a: 1}
+  ColorToAdd: {r: 0, g: 0, b: 0, a: 1}
   _puzzlePiecePrefab: {fileID: 8260267307351037599, guid: 3dc39c97364e2034a912e2c744069509, type: 3}
-  _rows: 3
-  _columns: 3
-  _darkenAmount: 0.5
-  _circleRadius: 50
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0

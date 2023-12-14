@@ -1,29 +1,61 @@
 ﻿using System;
-using System.Collections.Generic;
 using UnityEngine;
-using Random = UnityEngine.Random;
+using Random = System.Random;
+
+public enum JointType
+{
+    None,
+    Circle,
+    Rect,
+}
+
+public enum ShapeType
+{
+    Circle,
+    Rect
+}
+
+public struct DrawStruct
+{
+    public bool IsRightSide;
+    public bool IsLeftSide;
+    public bool IsUpSide;
+    public bool IsDownSide;
+    public bool IsRight;
+    public bool IsLeft;
+    public bool IsUp;
+    public bool IsDown;
+    public float Width;
+    public float Height;
+    public Texture2D Texture;
+}
 
 public class PuzzleCreator : MonoBehaviour, IDisposable
 {
     private const int kDefaultOrder = -1;
 
-    [SerializeField] private Texture2D _originalImage;
+    [SerializeField] public Texture2D OriginalImage;
+    [SerializeField] public int Rows = 3;
+    [SerializeField] public int Columns = 3;
+    [SerializeField, Range(0, 1)] public float BackgroundDarkenAmount = 0.5f;
+    [SerializeField] public int SizeJoint = 50;
+    [SerializeField] public JointType Joint = JointType.Circle;
+    [SerializeField] public int Seed = 0;
+    [SerializeField] public Color ColorToRemove = Color.white;
+    [SerializeField] public Color ColorToAdd = Color.black;
     [SerializeField] private GameObject _puzzlePiecePrefab;
-    [SerializeField] private int _rows = 3;
-    [SerializeField] private int _columns = 3;
-    [SerializeField] private float _darkenAmount = 0.5f;
-    [SerializeField] private int _circleRadius = 50;
 
+    public Random Random;
     private PuzzlePiece _backgroundPiece;
-    private readonly List<PuzzlePiece> _pieceList;
+    private PuzzlePiece[][] _pieceArray;
 
-    public PuzzleCreator()
-    {
-        _pieceList = new List<PuzzlePiece>();
-    }
+    public PuzzlePiece[][] PieceArray => _pieceArray;
+    public PuzzlePiece BackgroundPiece => _backgroundPiece;
 
     public void Start()
     {
+        Random ??= new Random(Seed);
+
         CreatePuzzlePieces();
     }
 
@@ -36,68 +68,174 @@ public class PuzzleCreator : MonoBehaviour, IDisposable
     {
         Destroy(_backgroundPiece);
 
-        foreach (var piece in _pieceList)
+        foreach (var row in _pieceArray)
         {
-            Destroy(piece);
+            for (var j = 0; j < row.Length; j++)
+            {
+                var piece = row[j];
+                Destroy(piece);
+                row[j] = null;
+            }
         }
-
-        _pieceList.Clear();
     }
 
     private void CreatePuzzlePieces()
     {
         CreateBackgroundSprite();
-        var pieceWidth = (float)_originalImage.width / _columns;
-        var pieceHeight = (float)_originalImage.height / _rows;
+        var pieceWidth = (float) OriginalImage.width / Columns;
+        var pieceHeight = (float) OriginalImage.height / Rows;
 
-        for (var i = 0; i < _rows; i++)
+        _pieceArray = new PuzzlePiece[Rows][];
+
+        for (int i = 0; i < _pieceArray.Length; i++)
         {
-            for (var j = 0; j < _columns; j++)
-            {
-                var isRight = j != _columns - 1;
-                var isUp = i != _rows - 1;
-                var isLeft = j != 0;
-                var isDown = i != 0;
+            _pieceArray[i] = new PuzzlePiece[Columns];
+        }
 
-                var x = j * pieceWidth - (isLeft ? _circleRadius : 0);
-                var y = i * pieceHeight - (isDown ? _circleRadius : 0);
-                var width = pieceWidth + (isLeft ? _circleRadius : 0) + (isRight ? _circleRadius : 0);
-                var height = pieceHeight + (isUp ? _circleRadius : 0) + (isDown ? _circleRadius : 0);
+        for (var i = 0; i < Rows; i++)
+        {
+            for (var j = 0; j < Columns; j++)
+            {
+                var isRightSide = j != Columns - 1;
+                var isLeftSide = j != 0;
+                var isUpSide = i != Rows - 1;
+                var isDownSide = i != 0;
+
+                var isRightColor = (j + 1 > Columns - 1) ? NextBoolean(Random) :
+                    (_pieceArray[i][j + 1] == null) ? NextBoolean(Random) :
+                    !_pieceArray[i][j + 1].PuzzlePieceSides.IsLeft;
+
+                var isLeftColor = (j - 1 < 0) ? NextBoolean(Random) :
+                    (_pieceArray[i][j - 1] == null) ? NextBoolean(Random) :
+                    !_pieceArray[i][j - 1].PuzzlePieceSides.IsRight;
+
+                var isUpColor = (i + 1 > Rows - 1) ? NextBoolean(Random) :
+                    (_pieceArray[i + 1][j] == null) ? NextBoolean(Random) :
+                    !_pieceArray[i + 1][j].PuzzlePieceSides.IsDown;
+
+                var isDownColor = (i - 1 < 0) ? NextBoolean(Random) :
+                    (_pieceArray[i - 1][j] == null) ? NextBoolean(Random) :
+                    !_pieceArray[i - 1][j].PuzzlePieceSides.IsUp;
+
+
+                var x = (Joint == JointType.None) ? j * pieceWidth : j * pieceWidth - (isLeftSide ? SizeJoint : 0);
+                var y = (Joint == JointType.None) ? i * pieceHeight : i * pieceHeight - (isDownSide ? SizeJoint : 0);
+
+                var width = (Joint == JointType.None)
+                    ? pieceWidth
+                    : pieceWidth + (isLeftSide ? SizeJoint : 0) + (isRightSide ? SizeJoint : 0);
+
+                var height = (Joint == JointType.None)
+                    ? pieceHeight
+                    : pieceHeight + (isUpSide ? SizeJoint : 0) + (isDownSide ? SizeJoint : 0);
 
                 var rect = new Rect(x, y, width, height);
 
-                var puzzleTexture = new Texture2D((int)width, (int)height);
+                var puzzleTexture = new Texture2D((int) width, (int) height);
+                var originalTexture = new Texture2D((int) width, (int) height);
+                var examplePixels = OriginalImage.GetPixels((int) rect.x, (int) rect.y, (int) width, (int) height);
+                puzzleTexture.SetPixels(examplePixels);
+                originalTexture.SetPixels(examplePixels);
 
-                puzzleTexture.SetPixels(_originalImage.GetPixels((int)rect.x, (int)rect.y, (int)width, (int)height));
-
-                if (isRight)
+                var drawStruct = new DrawStruct
                 {
-                    DrawCircle(puzzleTexture, new Vector2(width - _circleRadius, height / 2), _circleRadius, Color.white);
-                }
+                    IsLeftSide = isLeftSide,
+                    IsDownSide = isDownSide,
+                    IsRightSide = isRightSide,
+                    IsUpSide = isUpSide,
+                    IsLeft = isLeftColor,
+                    IsDown = isDownColor,
+                    IsRight = isRightColor,
+                    IsUp = isUpColor,
+                    Width = width,
+                    Height = height,
+                    Texture = puzzleTexture
+                };
 
-                if (isUp)
-                {
-                    DrawCircle(puzzleTexture, new Vector2(width / 2, height - _circleRadius), _circleRadius, Color.white);
-                }
+                SwitchType(drawStruct);
 
-                if (isDown)
-                {
-                    DrawCircle(puzzleTexture, new Vector2(width / 2, _circleRadius), _circleRadius, Color.white);
-                }
-
-                if (isLeft)
-                {
-                    DrawCircle(puzzleTexture, new Vector2(_circleRadius, height / 2), _circleRadius, Color.white);
-                }
-
+                RepaintMask(puzzleTexture, originalTexture);
                 puzzleTexture.Apply();
 
-                CreatePiece(i, j, puzzleTexture);
+                CreatePiece(i, j, puzzleTexture, drawStruct);
             }
         }
     }
 
-    private void CreatePiece(int i, int j, Texture2D puzzleTexture)
+    private void SwitchType(DrawStruct drawStruct)
+    {
+        if (Joint == JointType.None)
+            return;
+
+        switch (Joint)
+        {
+            case JointType.Circle:
+                DrawShapeMask(drawStruct, ShapeType.Circle);
+
+                break;
+            case JointType.Rect:
+                DrawShapeMask(drawStruct, ShapeType.Rect);
+
+                break;
+            // You can add new JointType and use it
+        }
+    }
+
+    private void DrawShapeMask(DrawStruct drawStruct, ShapeType shapeType)
+    {
+        if (drawStruct.IsUpSide)
+        {
+            DrawRectangle(drawStruct.Texture,
+                new Rect(0, drawStruct.Height - SizeJoint, drawStruct.Width, SizeJoint * 2), ColorToRemove);
+
+            DrawShape(drawStruct.Texture, shapeType, new Vector2(drawStruct.Width / 2, drawStruct.Height - SizeJoint),
+                drawStruct.IsUp ? ColorToRemove : ColorToAdd);
+        }
+
+        if (drawStruct.IsDownSide)
+        {
+            DrawRectangle(drawStruct.Texture, new Rect(0, 0, drawStruct.Width, SizeJoint), ColorToRemove);
+
+            DrawShape(drawStruct.Texture, shapeType, new Vector2(drawStruct.Width / 2, SizeJoint),
+                drawStruct.IsDown ? ColorToRemove : ColorToAdd);
+        }
+
+        if (drawStruct.IsRightSide)
+        {
+            DrawRectangle(drawStruct.Texture,
+                new Rect(drawStruct.Width - SizeJoint, 0, SizeJoint * 2, drawStruct.Height), ColorToRemove);
+
+            DrawShape(drawStruct.Texture, shapeType, new Vector2(drawStruct.Width - SizeJoint, drawStruct.Height / 2),
+                drawStruct.IsRight ? ColorToRemove : ColorToAdd);
+        }
+
+        if (drawStruct.IsLeftSide)
+        {
+            DrawRectangle(drawStruct.Texture, new Rect(0, 0, SizeJoint, drawStruct.Height), ColorToRemove);
+
+            DrawShape(drawStruct.Texture, shapeType, new Vector2(SizeJoint, drawStruct.Height / 2),
+                drawStruct.IsLeft ? ColorToRemove : ColorToAdd);
+        }
+    }
+
+    private void DrawShape(Texture2D texture, ShapeType shapeType, Vector2 position, Color color)
+    {
+        switch (shapeType)
+        {
+            case ShapeType.Circle:
+                DrawCircle(texture, position, SizeJoint, color);
+
+                break;
+            case ShapeType.Rect:
+                DrawRectangle(texture,
+                    new Rect(position.x - SizeJoint, position.y - SizeJoint, SizeJoint * 2, SizeJoint * 2), color);
+
+                break;
+            // You can add new shapes and use it
+        }
+    }
+
+    private void CreatePiece(int i, int j, Texture2D puzzleTexture, DrawStruct drawStruct)
     {
         var puzzlePiece = Instantiate(_puzzlePiecePrefab).GetComponent<PuzzlePiece>();
         puzzlePiece.name = "PuzzlePiece_" + i + "_" + j;
@@ -108,9 +246,17 @@ public class PuzzleCreator : MonoBehaviour, IDisposable
 
         puzzlePiece.Sprite = puzzlePieceSprite;
         puzzlePiece.transform.parent = transform;
-        //puzzlePiece.MaskInteraction = SpriteMaskInteraction.VisibleInsideMask;
         puzzlePiece.transform.position = GetRandomPosition(_backgroundPiece.SpriteRenderer);
-        _pieceList.Add(puzzlePiece);
+
+        puzzlePiece.PuzzlePieceSides = new PuzzlePieceSides
+        {
+            IsDown = drawStruct.IsDown,
+            IsUp = drawStruct.IsUp,
+            IsLeft = drawStruct.IsLeft,
+            IsRight = drawStruct.IsRight,
+        };
+        puzzlePiece.Initialize();
+        _pieceArray[i][j] = puzzlePiece;
     }
 
     private void CreateBackgroundSprite()
@@ -118,37 +264,40 @@ public class PuzzleCreator : MonoBehaviour, IDisposable
         _backgroundPiece = Instantiate(_puzzlePiecePrefab).GetComponent<PuzzlePiece>();
         _backgroundPiece.name = "PuzzlePieceExample";
 
-        Sprite backgroundSpriteSprite = Sprite.Create(_originalImage,
-            new Rect(0, 0, _originalImage.width, _originalImage.height), new Vector2(0.5f, 0.5f));
+        var backgroundSpriteSprite = Sprite.Create(OriginalImage,
+            new Rect(0, 0, OriginalImage.width, OriginalImage.height), new Vector2(0.5f, 0.5f));
 
         _backgroundPiece.Sprite = backgroundSpriteSprite;
 
-        _backgroundPiece.SpriteRendererColor = new Color(_backgroundPiece.SpriteRendererColor.r * _darkenAmount,
-            _backgroundPiece.SpriteRendererColor.g * _darkenAmount,
-            _backgroundPiece.SpriteRendererColor.b * _darkenAmount,
+        _backgroundPiece.SpriteRendererColor = new Color(
+            _backgroundPiece.SpriteRendererColor.r * BackgroundDarkenAmount,
+            _backgroundPiece.SpriteRendererColor.g * BackgroundDarkenAmount,
+            _backgroundPiece.SpriteRendererColor.b * BackgroundDarkenAmount,
             _backgroundPiece.SpriteRendererColor.a);
 
+        _backgroundPiece.IsBackground = this;
         _backgroundPiece.Order = kDefaultOrder;
+        _backgroundPiece.Initialize();
     }
 
     private Vector3 GetRandomPosition(SpriteRenderer spriteRenderer)
     {
-        float textureWidth = _originalImage.width;
-        float textureHeight = _originalImage.height;
+        var textureWidth = OriginalImage.width;
+        var textureHeight = OriginalImage.height;
 
-        float spriteWidth = spriteRenderer.sprite.bounds.size.x;
-        float spriteHeight = spriteRenderer.sprite.bounds.size.y;
+        var spriteWidth = spriteRenderer.sprite.bounds.size.x;
+        var spriteHeight = spriteRenderer.sprite.bounds.size.y;
 
-        float randomXInTexture = Random.Range(0f, textureWidth);
-        float randomYInTexture = Random.Range(0f, textureHeight);
+        var randomXInTexture = UnityEngine.Random.Range(0f, textureWidth);
+        var randomYInTexture = UnityEngine.Random.Range(0f, textureHeight);
 
-        Vector3 randomPositionInTexture = new Vector3(
+        var randomPositionInTexture = new Vector3(
             (randomXInTexture / textureWidth - 0.5f) * spriteWidth,
             (randomYInTexture / textureHeight - 0.5f) * spriteHeight,
             0f
         );
 
-        Vector3 randomPositionInWorld = transform.TransformPoint(randomPositionInTexture);
+        var randomPositionInWorld = transform.TransformPoint(randomPositionInTexture);
 
         return randomPositionInWorld;
     }
@@ -170,5 +319,53 @@ public class PuzzleCreator : MonoBehaviour, IDisposable
                 }
             }
         }
+    }
+
+    private void DrawRectangle(Texture2D texture, Rect rect, Color color)
+    {
+        int textureWidth = texture.width;
+        int textureHeight = texture.height;
+
+        for (int x = (int) rect.xMin; x < rect.xMax; x++)
+        {
+            for (int y = (int) rect.yMin; y < rect.yMax; y++)
+            {
+                if (x >= 0 && x < textureWidth && y >= 0 && y < textureHeight)
+                {
+                    texture.SetPixel(x, y, color);
+                }
+            }
+        }
+    }
+
+    private void RepaintMask(Texture2D texture, Texture2D originalTexture)
+    {
+        var textureWidth = texture.width;
+        var textureHeight = texture.height;
+
+        for (int x = 0; x < textureWidth; x++)
+        {
+            for (int y = 0; y < textureHeight; y++)
+            {
+                if (texture.GetPixel(x, y).Equals(ColorToAdd))
+                {
+                    texture.SetPixel(x, y, originalTexture.GetPixel(x, y));
+                }
+                else if (texture.GetPixel(x, y).Equals(ColorToRemove))
+                {
+                    texture.SetPixel(x, y, new Color(0, 0, 0, 0));
+                }
+
+                if (x <= 0 || y <= 0 || x >= textureWidth || y >= textureHeight)
+                {
+                    texture.SetPixel(x, y, new Color(0, 0, 0, 0));
+                }
+            }
+        }
+    }
+
+    private bool NextBoolean(Random random)
+    {
+        return random.Next() > (int.MaxValue / 2);
     }
 }

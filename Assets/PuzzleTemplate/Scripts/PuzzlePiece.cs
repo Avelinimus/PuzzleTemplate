@@ -1,8 +1,19 @@
-﻿using UnityEngine;
+﻿using Unity.VisualScripting;
+using UnityEngine;
+
+public struct PuzzlePieceSides
+{
+    public bool IsRight;
+    public bool IsLeft;
+    public bool IsUp;
+    public bool IsDown;
+}
 
 public class PuzzlePiece : MonoBehaviour
 {
     [SerializeField] private SpriteRenderer _spriteRenderer;
+    [SerializeField] private Material _defaultMaterial;
+    [SerializeField] private Material _selectedMaterial;
 
     public Sprite Sprite
     {
@@ -22,11 +33,22 @@ public class PuzzlePiece : MonoBehaviour
         set => _spriteRenderer.sortingOrder = value;
     }
 
-    public SpriteMaskInteraction MaskInteraction
+    public SpriteRenderer SpriteRenderer => _spriteRenderer;
+
+    public PuzzlePieceSides PuzzlePieceSides;
+
+    public bool IsBackground;
+
+    public void Initialize()
     {
-        get => _spriteRenderer.maskInteraction;
-        set => _spriteRenderer.maskInteraction = value;
+        SetMaterial(_defaultMaterial);
     }
 
-    public SpriteRenderer SpriteRenderer => _spriteRenderer;
+    private void SetMaterial(Material material)
+    {
+        if (!IsBackground)
+        {
+            _spriteRenderer.material = material;
+        }
+    }
 }
