@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 7407328457006048920}
   - component: {fileID: 456050603681923936}
   - component: {fileID: 2212831350451135243}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: 'PuzzlePiece '
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -45,10 +45,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ed94cff5c886ca44b89745b3d8a7659c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  IsBackground: 0
   _spriteRenderer: {fileID: 2212831350451135243}
   _defaultMaterial: {fileID: 2100000, guid: fc46121e6db921d499868fbfa966b8b9, type: 2}
   _selectedMaterial: {fileID: 2100000, guid: 4d287cf81b584a644bc4277959d728c7, type: 2}
-  IsBackground: 0
+  _speedDragging: 10
+  _selectedOrder: 10
+  _defaultOrder: 1
+  _magneticOrder: 0
+  _scaleAnimation: 5
+  _scaleDefault: 0.5
+  _scaleSelected: 0.65
+  kScaleMagnetic: 0.5
+  _magneticPrefab: {fileID: 1167288817811571247, guid: 9206ccac801de6147a0172a96adbd6fe, type: 3}
 --- !u!212 &2212831350451135243
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -95,7 +104,7 @@ SpriteRenderer:
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 0.16, y: 0.16}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 0
