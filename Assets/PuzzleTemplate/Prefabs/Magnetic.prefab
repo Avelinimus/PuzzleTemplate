@@ -46,6 +46,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _boxCollider2D: {fileID: 690462759841940261}
+  _isDebug: 1
+  ConnectedPieceMagneticPiece: {fileID: 0}
+  PuzzlePiece: {fileID: 0}
 --- !u!61 &690462759841940261
 BoxCollider2D:
   m_ObjectHideFlags: 0

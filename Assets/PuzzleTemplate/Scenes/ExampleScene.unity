@@ -133,7 +133,6 @@ GameObject:
   m_Component:
   - component: {fileID: 509460204}
   - component: {fileID: 509460205}
-  - component: {fileID: 509460206}
   m_Layer: 0
   m_Name: PuzzleCreator
   m_TagString: Untagged
@@ -172,57 +171,14 @@ MonoBehaviour:
   Rows: 3
   Columns: 5
   BackgroundDarkenAmount: 0.5
-  SizeJoint: 25
+  SizeJoint: 50
   Joint: 1
   Seed: 0
   ColorToRemove: {r: 1, g: 0, b: 0, a: 1}
-  ColorToAdd: {r: 1, g: 1, b: 1, a: 1}
+  ColorToAdd: {r: 0, g: 0, b: 0, a: 1}
+  TimeToDragGroupSeconds: 1
+  DistanceToDragGroup: 70
   _puzzlePiecePrefab: {fileID: 8260267307351037599, guid: 3dc39c97364e2034a912e2c744069509, type: 3}
---- !u!61 &509460206
-BoxCollider2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 509460203}
-  m_Enabled: 1
-  m_Density: 1
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_ForceSendLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_ForceReceiveLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_ContactCaptureLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_CallbackLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  m_IsTrigger: 0
-  m_UsedByEffector: 0
-  m_UsedByComposite: 0
-  m_Offset: {x: 0, y: 0}
-  m_SpriteTilingProperty:
-    border: {x: 0, y: 0, z: 0, w: 0}
-    pivot: {x: 0, y: 0}
-    oldSize: {x: 0, y: 0}
-    newSize: {x: 0, y: 0}
-    adaptiveTilingThreshold: 0
-    drawMode: 0
-    adaptiveTiling: 0
-  m_AutoTiling: 0
-  serializedVersion: 2
-  m_Size: {x: 1, y: 1}
-  m_EdgeRadius: 0
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0

@@ -15,21 +15,48 @@ namespace Game.Puzzle
     {
         public MagneticSideType MagneticSideType;
         public bool IsShape;
-        public bool IsMagnetic;
+        public int Row;
+        public int Column;
     }
 
-    public class MagneticPiece : MonoBehaviour , IDisposable
+    public class MagneticPiece : MonoBehaviour, IDisposable
     {
         [SerializeField] private BoxCollider2D _boxCollider2D;
+        [SerializeField] private bool _isDebug;
 
-        public MagneticStruct MagneticStruct;
+        [HideInInspector] public MagneticStruct MagneticStruct;
 
-        public BoxCollider2D BoxCollider2D => _boxCollider2D;
+        [HideInInspector] public MagneticPiece ConnectedPieceMagneticPiece;
+        [HideInInspector] public BoxCollider2D BoxCollider2D => _boxCollider2D;
 
-        public PuzzlePiece PuzzlePiece;
+        [HideInInspector] public PuzzlePiece PuzzlePiece;
+
+        public bool IsMagnetic => ConnectedPieceMagneticPiece != null;
 
         public void Dispose()
         {
+        }
+
+        private void OnDrawGizmos()
+        {
+            if(!_isDebug)
+                return;
+
+            if (!IsMagnetic)
+            {
+                Gizmos.color = Color.red;
+            }
+            else
+            {
+                Gizmos.color = Color.green;
+            }
+
+            Gizmos.DrawWireCube(transform.position, _boxCollider2D.size/2);
+        }
+
+        public void SetSizeCollider(float size)
+        {
+            _boxCollider2D.size *= size;
         }
     }
 }

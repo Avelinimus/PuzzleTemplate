@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using Random = System.Random;
 
@@ -9,12 +11,6 @@ namespace Game.Puzzle
         None,
         Circle,
         Rect,
-    }
-
-    public enum ShapeType
-    {
-        Circle,
-        Rect
     }
 
     public struct DrawStruct
@@ -31,6 +27,8 @@ namespace Game.Puzzle
         public float Height;
         public Texture2D Texture;
         public float SizeJoint;
+        public int Row;
+        public int Col;
     }
 
     [RequireComponent(typeof(Texture2D))]
@@ -41,10 +39,9 @@ namespace Game.Puzzle
         private const string kBackgroundPuzzleName = "PuzzleBackground";
         private const string kPiecePuzzleNamePattern = "PuzzlePiece_{0}_{1}";
         private const string kPuzzleLayerName = "Puzzle";
-
+        private const float kFramesCount = 25;
 
         public event Action COMPLETE_LEVEL;
-        public event Action<PuzzlePiece> COMPLETE_PIECE;
 
         [HideInInspector] public Random Random;
         [SerializeField] public Texture2D OriginalImage;
@@ -56,11 +53,24 @@ namespace Game.Puzzle
         [SerializeField] public int Seed = 0;
         [SerializeField] public Color ColorToRemove = Color.white;
         [SerializeField] public Color ColorToAdd = Color.black;
+        [SerializeField] public float TimeToDragGroupSeconds = 1;
+        [SerializeField] public float DistanceToDragGroup = 1;
         [SerializeField] private GameObject _puzzlePiecePrefab;
 
         private PuzzlePiece _backgroundPiece;
         private PuzzlePiece[][] _pieceArray;
         private PuzzlePiece _currentPuzzlePiece;
+        private List<PuzzlePiece> _dragElements;
+
+        private Vector3 _firstPosition;
+        private Vector3 _lastPosition;
+        private float _timeToDragGroupSeconds;
+        private bool _isGroupChance;
+        private bool _isGroup;
+        private bool _isEndDragging;
+        private bool _isCheckCorretBlocks;
+        private bool _isNextFrame;
+        private float _frames;
 
         public PuzzlePiece[][] PieceArray => _pieceArray;
         public PuzzlePiece BackgroundPiece => _backgroundPiece;
@@ -68,7 +78,7 @@ namespace Game.Puzzle
         public void Start()
         {
             Random ??= new Random(Seed);
-
+            _dragElements = new List<PuzzlePiece>();
             CreatePuzzlePieces();
         }
 
@@ -86,7 +96,6 @@ namespace Game.Puzzle
                 for (var j = 0; j < row.Length; j++)
                 {
                     var piece = row[j];
-                    piece.COMPLETE_PIECE -= OnCompletePiece;
                     piece.Dispose();
                     Destroy(piece);
                     row[j] = null;
@@ -109,10 +118,18 @@ namespace Game.Puzzle
 #endif
 
                 TouchPuzzlePiece(mousePosition);
+                _isEndDragging = false;
             }
             else
             {
-                EndDragging();
+                if (_isNextFrame)
+                {
+                    NextFrameEndDragging();
+                }
+                else
+                {
+                    EndDragging();
+                }
             }
         }
 
@@ -123,12 +140,13 @@ namespace Game.Puzzle
             RaycastHit2D[] hits = Physics2D.RaycastAll(Camera.main.ScreenToWorldPoint(position), Vector2.zero,
                 Mathf.Infinity, layerMask);
 
-            if (hits.Length <= 0)
+            var hitsResult = hits.OrderByDescending(temp => temp.transform.GetComponent<PuzzlePiece>().Order).ToArray();
+
+            if (hitsResult.Length <= 0)
             {
                 if (_currentPuzzlePiece != null)
                 {
-                    position.z = kMousePositionZ;
-                    _currentPuzzlePiece.Dragging(Camera.main.ScreenToWorldPoint(position));
+                    Dragging(position);
                 }
 
                 return;
@@ -136,15 +154,15 @@ namespace Game.Puzzle
 
             if (_currentPuzzlePiece == null)
             {
-                PuzzlePiece[] puzzlePiecesArray = new PuzzlePiece[hits.Length];
+                PuzzlePiece[] puzzlePiecesArray = new PuzzlePiece[hitsResult.Length];
 
                 for (var i = 0; i < puzzlePiecesArray.Length; i++)
                 {
-                    puzzlePiecesArray[i] = hits[i].transform.GetComponent<PuzzlePiece>();
+                    puzzlePiecesArray[i] = hitsResult[i].transform.GetComponent<PuzzlePiece>();
                 }
 
                 Array.Sort(puzzlePiecesArray, (x, y) => Mathf.Max(x.Order, y.Order));
-                _currentPuzzlePiece = hits[0].transform.GetComponent<PuzzlePiece>();
+                _currentPuzzlePiece = hitsResult[0].transform.GetComponent<PuzzlePiece>();
             }
 
             if (_currentPuzzlePiece == null)
@@ -153,23 +171,154 @@ namespace Game.Puzzle
             if (!_currentPuzzlePiece.IsDragging)
             {
                 _currentPuzzlePiece.BeginDragging();
+                _dragElements.Add(_currentPuzzlePiece);
+                _firstPosition = position;
             }
             else
             {
-                position.z = kMousePositionZ;
-                _currentPuzzlePiece.Dragging(Camera.main.ScreenToWorldPoint(position));
+                Dragging(position);
             }
+        }
+
+        private void Dragging(Vector3 position)
+        {
+            position.z = kMousePositionZ;
+          
+            var isSelectGroup = CheckSelectGroup(position);
+            var resultPosition = Camera.main.ScreenToWorldPoint(position);
+            if (isSelectGroup)
+            {
+                _dragElements.Clear();
+                _currentPuzzlePiece.DraggingGroup(_dragElements, resultPosition);
+            }
+            else
+            {
+                _currentPuzzlePiece.Dragging(resultPosition);
+            }
+
+            _lastPosition = resultPosition;
+
+            if (_isCheckCorretBlocks)
+                return;
+
+            CheckCorrectBlocks();
+            _currentPuzzlePiece.SetSelectedMaterial();
+            _isCheckCorretBlocks = true;
+        }
+
+        private bool CheckSelectGroup(Vector3 position)
+        {
+            if (_timeToDragGroupSeconds >= TimeToDragGroupSeconds)
+                return true;
+
+            var distance = Vector3.Distance(position, _firstPosition);
+
+            if (distance <= DistanceToDragGroup)
+            {
+                _timeToDragGroupSeconds += Time.deltaTime;
+            }
+            else
+            {
+                _currentPuzzlePiece.ClearAllMagnetic();
+                CheckCorrectBlocks();
+                _currentPuzzlePiece.SetSelectedMaterial();
+                _isGroupChance = false;
+            }
+
+            var isSelectGroup = _timeToDragGroupSeconds >= TimeToDragGroupSeconds && _isGroupChance;
+
+            if (isSelectGroup)
+            {
+                _isGroup = true;
+            }
+
+            return isSelectGroup;
         }
 
         private void EndDragging()
         {
+            if (_isEndDragging)
+                return;
+
             if (_currentPuzzlePiece == null)
                 return;
 
-            _currentPuzzlePiece.EndDragging();
-            _currentPuzzlePiece.CheckMagnetic();
-
+            _currentPuzzlePiece.EndDragging(new List<PuzzlePiece>(), _lastPosition, _isGroup);
+            _isNextFrame = !CheckCorrectBlocks(true);
             _currentPuzzlePiece = null;
+
+            if (!_isNextFrame)
+            {
+                _dragElements.Clear();
+                _isGroup = false;
+            }
+            else
+            {
+                _frames = Time.deltaTime * kFramesCount;
+            }
+
+            _isGroupChance = true;
+            _timeToDragGroupSeconds = 0;
+            _isEndDragging = true;
+            _isCheckCorretBlocks = false;
+        }
+
+        private void NextFrameEndDragging()
+        {
+            _frames -= Time.deltaTime;
+
+            if (_frames > 0)
+                return;
+
+            if (!_isGroup)
+            {
+                _isNextFrame = false;
+
+                return;
+            }
+
+            for (var i = _dragElements.Count - 1; i >= 0; i--)
+            {
+                var puzzlePieceCheck = _dragElements[i];
+                puzzlePieceCheck.CheckMagnetic(Vector3.zero);
+            }
+
+            _isGroup = false;
+            _isNextFrame = false;
+            _dragElements.Clear();
+            CheckCorrectBlocks(true);
+        }
+
+        private bool CheckCorrectBlocks(bool isComplete = false)
+        {
+            bool isCompleteLevel = true;
+
+            foreach (var row in _pieceArray)
+            {
+                foreach (var puzzlePiece in row)
+                {
+                    if (isComplete)
+                    {
+                        if (!puzzlePiece.CheckIsCorrectBlocks() || !puzzlePiece.IsAllMagnetic)
+                            isCompleteLevel = false;
+                    }
+                    else
+                    {
+                        puzzlePiece.CheckIsCorrectBlocks();
+                    }
+                }
+            }
+
+            if (!isComplete)
+                return false;
+
+            if (!isCompleteLevel)
+                return false;
+
+            COMPLETE_LEVEL?.Invoke();
+            Debug.LogWarning("COMPLETE LEVEL");
+
+            return true;
         }
 
         private void CreatePuzzlePieces()
@@ -211,19 +360,13 @@ namespace Game.Puzzle
                         !_pieceArray[i - 1][j].PuzzlePieceStruct.IsUp;
 
 
-                    var x = (Joint == JointType.None) ? j * pieceWidth : j * pieceWidth - (isLeftSide ? SizeJoint : 0);
+                    var x = j * pieceWidth - (isLeftSide ? SizeJoint : 0);
 
-                    var y = (Joint == JointType.None)
-                        ? i * pieceHeight
-                        : i * pieceHeight - (isDownSide ? SizeJoint : 0);
+                    var y = i * pieceHeight - (isDownSide ? SizeJoint : 0);
 
-                    var width = (Joint == JointType.None)
-                        ? pieceWidth
-                        : pieceWidth + (isLeftSide ? SizeJoint : 0) + (isRightSide ? SizeJoint : 0);
+                    var width = pieceWidth + (isLeftSide ? SizeJoint : 0) + (isRightSide ? SizeJoint : 0);
 
-                    var height = (Joint == JointType.None)
-                        ? pieceHeight
-                        : pieceHeight + (isUpSide ? SizeJoint : 0) + (isDownSide ? SizeJoint : 0);
+                    var height = pieceHeight + (isUpSide ? SizeJoint : 0) + (isDownSide ? SizeJoint : 0);
 
                     var rect = new Rect(x, y, width, height);
 
@@ -246,7 +389,9 @@ namespace Game.Puzzle
                         Width = width,
                         Height = height,
                         Texture = puzzleTexture,
-                        SizeJoint = SizeJoint
+                        SizeJoint = SizeJoint,
+                        Row = i,
+                        Col = j
                     };
 
                     SwitchType(drawStruct);
@@ -292,7 +437,6 @@ namespace Game.Puzzle
             puzzlePiece.Sprite = puzzlePieceSprite;
             puzzlePiece.transform.parent = transform;
             puzzlePiece.transform.position = GetRandomPosition(_backgroundPiece.SpriteRenderer);
-            puzzlePiece.COMPLETE_PIECE += OnCompletePiece;
 
             puzzlePiece.PuzzlePieceStruct = new PuzzlePieceStruct
             {
@@ -300,40 +444,43 @@ namespace Game.Puzzle
                 IsUp = drawStruct.IsUp,
                 IsLeft = drawStruct.IsLeft,
                 IsRight = drawStruct.IsRight,
-                IsMagnetic = false,
+                Row = i,
+                Col = j,
+                Bounds = new Bounds(_backgroundPiece.SpriteRenderer.transform.position,
+                    _backgroundPiece.SpriteRenderer.bounds.size)
             };
-
             puzzlePiece.Initialize(drawStruct);
             _pieceArray[i][j] = puzzlePiece;
         }
 
         private void SwitchType(DrawStruct drawStruct)
         {
-            if (Joint == JointType.None)
-                return;
-
             switch (Joint)
             {
+                case JointType.None:
+                    DrawShapeMask(drawStruct);
+
+                    break;
                 case JointType.Circle:
-                    DrawShapeMask(drawStruct, ShapeType.Circle);
+                    DrawShapeMask(drawStruct);
 
                     break;
                 case JointType.Rect:
-                    DrawShapeMask(drawStruct, ShapeType.Rect);
+                    DrawShapeMask(drawStruct);
 
                     break;
                 // You can add new JointType and use it
             }
         }
 
-        private void DrawShapeMask(DrawStruct drawStruct, ShapeType shapeType)
+        private void DrawShapeMask(DrawStruct drawStruct)
         {
             if (drawStruct.IsUpSide)
             {
                 DrawRectangle(drawStruct.Texture,
                     new Rect(0, drawStruct.Height - SizeJoint, drawStruct.Width, SizeJoint * 2), ColorToRemove);
 
-                DrawShape(drawStruct.Texture, shapeType,
+                DrawShape(drawStruct.Texture, Joint,
                     new Vector2(drawStruct.Width / 2, drawStruct.Height - SizeJoint),
                     drawStruct.IsUp ? ColorToRemove : ColorToAdd);
             }
@@ -342,7 +489,7 @@ namespace Game.Puzzle
             {
                 DrawRectangle(drawStruct.Texture, new Rect(0, 0, drawStruct.Width, SizeJoint), ColorToRemove);
 
-                DrawShape(drawStruct.Texture, shapeType, new Vector2(drawStruct.Width / 2, SizeJoint),
+                DrawShape(drawStruct.Texture, Joint, new Vector2(drawStruct.Width / 2, SizeJoint),
                     drawStruct.IsDown ? ColorToRemove : ColorToAdd);
             }
 
@@ -351,7 +498,7 @@ namespace Game.Puzzle
                 DrawRectangle(drawStruct.Texture,
                     new Rect(drawStruct.Width - SizeJoint, 0, SizeJoint * 2, drawStruct.Height), ColorToRemove);
 
-                DrawShape(drawStruct.Texture, shapeType,
+                DrawShape(drawStruct.Texture, Joint,
                     new Vector2(drawStruct.Width - SizeJoint, drawStruct.Height / 2),
                     drawStruct.IsRight ? ColorToRemove : ColorToAdd);
             }
@@ -360,20 +507,20 @@ namespace Game.Puzzle
             {
                 DrawRectangle(drawStruct.Texture, new Rect(0, 0, SizeJoint, drawStruct.Height), ColorToRemove);
 
-                DrawShape(drawStruct.Texture, shapeType, new Vector2(SizeJoint, drawStruct.Height / 2),
+                DrawShape(drawStruct.Texture, Joint, new Vector2(SizeJoint, drawStruct.Height / 2),
                     drawStruct.IsLeft ? ColorToRemove : ColorToAdd);
             }
         }
 
-        private void DrawShape(Texture2D texture, ShapeType shapeType, Vector2 position, Color color)
+        private void DrawShape(Texture2D texture, JointType jointType, Vector2 position, Color color)
         {
-            switch (shapeType)
+            switch (jointType)
             {
-                case ShapeType.Circle:
+                case JointType.Circle:
                     DrawCircle(texture, position, SizeJoint, color);
 
                     break;
-                case ShapeType.Rect:
+                case JointType.Rect:
                     DrawRectangle(texture,
                         new Rect(position.x - SizeJoint, position.y - SizeJoint, SizeJoint * 2, SizeJoint * 2), color);
 
@@ -402,11 +549,6 @@ namespace Game.Puzzle
             var randomPositionInWorld = transform.TransformPoint(randomPositionInTexture);
 
             return randomPositionInWorld;
-        }
-
-        private void OnCompletePiece(PuzzlePiece puzzlePiece)
-        {
-            COMPLETE_PIECE?.Invoke(puzzlePiece);
         }
 
         private void DrawCircle(Texture2D texture, Vector2 center, float radius, Color color)
