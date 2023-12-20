@@ -170,6 +170,7 @@ namespace Game.Puzzle
 
             if (!_currentPuzzlePiece.IsDragging)
             {
+                _isNextFrame = false;
                 _currentPuzzlePiece.BeginDragging();
                 _dragElements.Add(_currentPuzzlePiece);
                 _firstPosition = position;

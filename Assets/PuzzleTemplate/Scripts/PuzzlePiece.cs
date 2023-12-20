@@ -34,7 +34,7 @@ namespace Game.Puzzle
         [SerializeField] private int _defaultOrder = 1;
         [SerializeField] private int _magneticOrder = 0;
         [SerializeField] private float _scaleDefault = .5f;
-        [SerializeField] private float _scaleSelected = 1;
+        [SerializeField] private float _scaleSelected = .55f;
         [SerializeField] private GameObject _magneticPrefab;
         [SerializeField] private bool _isDebug;
 
@@ -133,13 +133,13 @@ namespace Game.Puzzle
                 }
             }
 
-            _isDragging = false;
             SetMaterial(_defaultMaterial);
             ScaleAnimation(_scaleDefault);
             ClearAllMagnetic();
             CheckMagnetic(Vector3.zero);
             var offsetLastPosition = (isGroup) ? lastPosition : transform.position;
             DraggingGroup(new List<PuzzlePiece>(), offsetLastPosition, true);
+            _isDragging = false;
         }
 
         public void DraggingGroup(List<PuzzlePiece> dragElements, Vector3 position,
@@ -300,7 +300,6 @@ namespace Game.Puzzle
                 SetMaterial(isCorrect ? _defaultMaterial : _wrongMaterial);
                 var order = (IsMagnetic) ? _magneticOrder : _defaultOrder;
                 Order = isCorrect ? order : _wrongOrder;
-
                 if (!isCorrect)
                     return false;
             }
@@ -433,7 +432,6 @@ namespace Game.Puzzle
 
         private void ScaleAnimation(float targetScale)
         {
-            //Can animate scale
             transform.localScale = Vector3.one * targetScale;
         }
 
