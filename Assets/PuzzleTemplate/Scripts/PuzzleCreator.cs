@@ -77,7 +77,11 @@ namespace Game.Puzzle
 
         public void Start()
         {
-            Random ??= new Random(Seed);
+            if (Random == null)
+            {
+                Random = new Random(Seed);
+            }
+
             _dragElements = new List<PuzzlePiece>();
             CreatePuzzlePieces();
         }
