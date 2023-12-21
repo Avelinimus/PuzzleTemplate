@@ -38,7 +38,6 @@ namespace Game.Puzzle
         private const float kMousePositionZ = 10f;
         private const string kBackgroundPuzzleName = "PuzzleBackground";
         private const string kPiecePuzzleNamePattern = "PuzzlePiece_{0}_{1}";
-        private const string kPuzzleLayerName = "Puzzle";
         private const float kFramesCount = 25;
 
         public event Action COMPLETE_LEVEL;
@@ -139,12 +138,26 @@ namespace Game.Puzzle
 
         private void TouchPuzzlePiece(Vector3 position)
         {
-            int layerMask = 1 << LayerMask.NameToLayer(kPuzzleLayerName);
+            var hits = Physics2D.RaycastAll(Camera.main.ScreenToWorldPoint(position), Vector2.zero,
+                Mathf.Infinity).ToList();
 
-            RaycastHit2D[] hits = Physics2D.RaycastAll(Camera.main.ScreenToWorldPoint(position), Vector2.zero,
-                Mathf.Infinity, layerMask);
+            var puzzlePieces = new List<PuzzlePiece>();
 
-            var hitsResult = hits.OrderByDescending(temp => temp.transform.GetComponent<PuzzlePiece>().Order).ToArray();
+            for (int i = hits.Count - 1; i >= 0; i--)
+            {
+                var puzzlePiece = hits[i].transform.GetComponent<PuzzlePiece>();
+
+                if (puzzlePiece == null)
+                {
+                    hits.Remove(hits[i]);
+                }
+                else
+                {
+                    puzzlePieces.Add(puzzlePiece);
+                }
+            }
+
+            var hitsResult = puzzlePieces.OrderByDescending(temp => temp.Order).ToArray();
 
             if (hitsResult.Length <= 0)
             {
@@ -188,9 +201,10 @@ namespace Game.Puzzle
         private void Dragging(Vector3 position)
         {
             position.z = kMousePositionZ;
-          
+
             var isSelectGroup = CheckSelectGroup(position);
             var resultPosition = Camera.main.ScreenToWorldPoint(position);
+
             if (isSelectGroup)
             {
                 _dragElements.Clear();
@@ -454,6 +468,7 @@ namespace Game.Puzzle
                 Bounds = new Bounds(_backgroundPiece.SpriteRenderer.transform.position,
                     _backgroundPiece.SpriteRenderer.bounds.size)
             };
+
             puzzlePiece.Initialize(drawStruct);
             _pieceArray[i][j] = puzzlePiece;
         }
